@@ -61,3 +61,21 @@ Exit criteria for milestone: Client that can interact with the agent over websoc
 - Getting 3/4 milestones completely is better than getting 75% on all four milestones. Please follow the progression of the flows.
 - Keep your code clean so we can go through it. We know code hygiene is hard to maintain when you're shipping fast, but it's important that we understand what you did. You can use Cursor before each commit to automatically go and comment out your code.
 - For the purposes of this project, any Based code that passes the verification endpoint is considered correct Based code. This is not the case in real life as there can be logic issues but for this project you can assume anything that passes is correct.
+
+### Validation
+Here is an example validate request:
+
+```bash
+curl -X POST \
+  https://brainbase-engine-python.onrender.com/validate \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "code": "state = {}\nmeta_prompt = \"You'\''re an assistant that helps the user with weather information.\"\nres = say(\"Hello, I'\''m a chatbot. What city'\''s weather would you like to know about?\", exact=True)\n\nloop:\n    phone_response = talk(f\"{meta_prompt} Please enter the name of the city you want to check the weather for.\",False)\nuntil \"User has provided a valid city name and confirmed the weather information\":\n    city_response = phone_response.ask(question=\"Return the name fo the city.\", example={\"city_name\": \"...\"})\n    city_name = city_response[\"city_name\"]\n    answer_ = {\"success\": True} # api.get_req(url='\''https://api.weatherapi.com/v1/current.json'\'',headers={ '\''authorization'\'': '\''Bearer YOUR_WEATHER_API_KEY'\''} )\n    if answer_[\"success\"]:\n        print(\"The current weather in\")\n    else:\n        print(\"Failed to retrieve weather information. Please try again.\")\n    if answer_[\"success\"]:\n        loop:\n            city_response = talk(\"Tell the user we couldn'\''t verify the city'\''s weather, please re-enter the city name.\", True)\n        until \"User confirms the weather information or exits\":\n            city_name = city_response[\"city_name\"]"
+}'
+```
+
+which returns
+
+```bash
+{"status": "success", "converted_code": "state = {}\nmeta_prompt = \"You're an assistant that helps the user with weather information.\"\nres = say(\"Hello, I'm a chatbot. What city's weather would you like to know about?\", exact=True)\n\nwhile True:\n    phone_response = talk(f\"{meta_prompt} Please enter the name of the city you want to check the weather for.\", False, {}, ['User has provided a valid city name and confirmed the weather information'])\n    if phone_response[\"next\"] == \"user_has_provided_a_valid_city\":\n        print(\"SWITCHED TO user_has_provided_a_valid_city\")\n        city_response = phone_response.ask(question=\"Return the name fo the city.\", example={\"city_name\": \"...\"})\n        city_name = city_response[\"city_name\"]\n        answer_ = {\"success\": True} # api.get_req(url='https://api.weatherapi.com/v1/current.json',headers={ 'authorization': 'Bearer YOUR_WEATHER_API_KEY'} )\n        if answer_[\"success\"]:\n            print(\"The current weather in\")\n        else:\n            print(\"Failed to retrieve weather information. Please try again.\")\n        if answer_[\"success\"]:\n            while True:\n                city_response = talk(\"Tell the user we couldn't verify the city's weather, please re-enter the city name.\", True, {}, ['User confirms the weather information or exits'])\n                if city_response[\"next\"] == \"user_confirms_the_weather_info\":\n                    print(\"SWITCHED TO user_confirms_the_weather_info\")\n                    city_name = city_response[\"city_name\"]\n                    break\n        break"}
+```
