@@ -1,7 +1,7 @@
 # Brainbase – Vibe-code Agents
 Brainbase is a powerful tool for provisioning complex AI agents. Even though our language can be written by humans, it was actually built to be written by AI, so that anyone, technical or non-technical can create their own agent just by talking.
 
-We call it vibe-coding your agents.
+We call it *vibe-coding your agents*.
 
 We want you to build an early version of our next flagship product: Kafka
 
@@ -57,4 +57,7 @@ The client should be able to connect to the websocket agent from Milestone 3 and
 Exit criteria for milestone: Client that can interact with the agent over websocket
 
 ## Rules and Guidelines
-- Using coding assistants such as ChatGPT, Claude, Cursor and other are absolutely allowed and strongly encouraged. If you can build this entire project through vibe coding 
+- Using coding assistants such as ChatGPT, Claude, Cursor and other are absolutely allowed and strongly encouraged. If you can build this entire project through vibe coding we have no problem with it :)
+– Getting 3/4 milestones completely is better than getting 75% on all four milestones. Please follow the progression of the flows.
+– Keep your code clean so we can go through it. We know code hygiene is hard to maintain when you're shipping fast, but it's important that we understand what you did. You can use Cursor before each commit to automatically go and comment out your code.
+– For the purposes of this project, any Based code that passes the verification endpoint is considered correct Based code. This is not the case in real life as there can be logic issues but for this project you can assume anything that passes is correct.
