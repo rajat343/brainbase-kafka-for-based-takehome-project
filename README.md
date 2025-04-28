@@ -18,8 +18,8 @@ Kafka is our version of Cursor/Windsurf for vibe coding AI agents, which works v
 
 Kafka has a frontend (client) and a backend (AI server).
 
-Frontend: NextJS, React, Typescript, Tailwind CSS, Shadcn
-Backend: Python
+Frontend: NextJS, React, TypeScript, Tailwind CSS, Shadcn
+Backend: Python or TypeScript
 
 ### Frontend
 Kafka's frontend should look similar to Cursor/Windsurf and should be styled similarly to the following, internal version we have of Kafka:
@@ -29,7 +29,7 @@ Kafka's frontend should look similar to Cursor/Windsurf and should be styled sim
 You are encouraged to use any frontend framework to copy this UI such as Bolt.new or Lovable.
 
 ### Backend
-Kafka's backend needs to be written in Python and must be stateful (websocket connection). Here, there are no constraints on the agent framework underneath, however we've seen the best working ones to be just using pure LLMs that are provided necessary context and output diffs.
+Kafka's backend needs to be written in Python or TypeScript and must be stateful (websocket connection). Here, there are no constraints on the agent framework underneath, however we've seen the best working ones to be just using pure LLMs that are provided necessary context and output diffs.
 
 We suggest using unified diff format and applying changes using https://gist.github.com/noporpoise/16e731849eb1231e86d78f9dfeca3abc.
 
