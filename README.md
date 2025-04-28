@@ -36,15 +36,15 @@ We suggest using unified diff format and applying changes using https://gist.git
 ## Milestones
 We expect you to approach this task in steps which have associated milestones:
 
-### Milestone 1: Agent that can generate Based code and iterate
-Create an agent that will take resources provided (including `BASED_GUIDE.md`) and be able to write simple Based code as output (not diff). Every time the agent writes a piece of Based code it should be run through the validation endpoint, if successful there are no further iterations, if failed the errors from the validation endpoint should be fed back into the LLM until it generates succesful code.
-
-Exit criteria for milestone: Agent can write simple Based code and can iterate to fix errors
+### Milestone 1: Agent that can generate Based code
+Create an agent that will take resources provided (including `BASED_GUIDE.md`) and be able to write simple Based code as output (not diff). The agent should use the knowledge from the Based documentation to write Based.
+Exit criteria for milestone: Agent can write simple Based code
 
 ### Milestone 2: Agent that can generate Based diffs and apply
-Modify your first agent to output not full Based code but unified diffs on the code written so far and then apply them. Should still be able to iterate. When the diff format is wrong, there should be a checker that notices the diff format is wrong and has the LLM redo it.
+Modify your first agent to output not full Based code but unified diffs on the code written so far and then apply them. Should still be able to iterate. When the diff format is wrong, there should be a checker that notices the diff format is wrong and has the LLM redo it. It runs the Based code (python example:
+https://github.com/BrainbaseHQ/guides/blob/main/hello_world/brainbase_runner.py). You will need to use the Braibase API/SDK (or our web client) to create a worker with the generated flow so that you can run it. You can get an API key here - https://beta.usebrainbase.com/dashboard/settings.
 
-Exit criteria for milestone: Agent can write Based code diffs to modify the existing code and can iterate to fix errors
+Exit criteria for milestone: Agent can write Based code diffs to modify the existing code that runs without errors.
 
 ### Milestone 3: Websocket agent
 The agent from Milestone 2 can be connected via websocket. In each websocket session, keep the messages so far in the websocket session in an array (you can also keep the code so far here), instead of relying on the client to keep passing in past messages in it's API requests.
