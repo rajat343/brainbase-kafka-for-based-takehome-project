@@ -1,146 +1,36 @@
-https://docs.usebrainbase.com/based-crash-course
-Details of above link are below
+# Based Language Fundamentals - Core Constructs Reference - Brainbase
 
-Based Crash Course - Build Platform Agnostic Conversational Agents
-Based Crash Course
-Welcome to the Based Crash Course! This guide introduces you to Based, a powerful, domain-specific programming language designed to build platform agnostic conversational agents. Deploy conversational workflows on chat, voice, email, SMS, and more with ease, enabling seamless data exchange and a unified user experience across platforms.
+Welcome to the **Based Language Fundamentals** guide. This reference document provides a comprehensive explanation of Based’s core language constructs, their declaration syntax, arguments, and practical usage examples. Understanding these fundamentals will enable you to build sophisticated conversational agents with precision and confidence.
 
-What Is Based?
-Based is a high-level AI instruction language crafted to design dynamic conversational agents that operate flawlessly across multiple communication channels. It provides developers with an elegant, high-level syntax to build interactive workflows quickly and reliably.
+## Core Language Constructs
 
-Key features of Based include:
-Intuitive and Expressive Syntax: Develop complex conversational logic with clarity and brevity.
-Specialized Constructs: Utilize built-in keywords like talk, loop, until, and ask to manage conversation flow and state effortlessly.
-Cross-Platform Flexibility: Create agents deployable on chat, voice, email, SMS, and more—all while sharing data seamlessly across channels.
-
-Core Conversation Flow Constructs
-Based scripts use a trio of keywords to build interactive conversations:
-talk: Sends a message or prompt to the user and waits for a response (or specify False as the second argument to wait for the user to send a message first).
-loop: Begins a conversational block that allows for repeated prompting.
-until: Specifies the condition under which the loop should end.
-In practice, the talk keyword is not used in isolation. It is usually enclosed in a loop/until structure. This pattern keeps the conversation repeating until valid input is obtained.
-
-Example Usage:
-loop:
-    # Send a prompt to the user asking for their preferred contact method.
-    response = talk(
-        "Hi there! What's your preferred contact method (email, phone, or SMS)?",
-        True,
-        {"preferred_contact": "email"} // Example default value
-    )
-until "User provides a valid contact method":
-    contactInfo = response.ask(
-        question="Extract and validate the contact method from the response.",
-        example={"preferred_contact": "email"}
-    )
-    # Validate the contact method; if invalid, the prompt repeats.
-    if contactInfo["preferred_contact"] not in ["email", "phone", "SMS"]:
-        print("Invalid contact method provided. Re-prompting...")
-    else:
-        print("Valid contact method received!")
-
-Core Language Constructs
-The ask Method
-The ask method is used to extract structured data from a response. By providing an example object, you can ensure that the output is formatted predictably for further processing.
-
-Example:
-
-# Extract structured details (full name and email) from a user response.
-userDetails = response.ask(
-    question="Return the user's full name and email address.",
-    example={"full_name": "John Doe", "email": "john.doe@example.com"}
-)
-
-Full Example: An Interactive Workflow
-Below is a complete example that combines talk, loop, until, and ask to build a seamless interactive conversation:
-
-state = {}
-meta_prompt = "You're an assistant that helps the user book shifts."
-res = say("Hello, I'm a chatbot. Let's start by gathering your details.")
-
-loop:
-    # Initiate conversation to collect user details.
-    phone_response = talk(
-        f"{meta_prompt} Please provide your phone number, full name, and facility name. Confirm these details once provided.",
-        True,
-        {"phone_number": "+16179011508", "full_name": "John Doe", "facility_name": "Facility A"}
-    )
-until "User has provided phone number, full name, and facility name and confirmed them":
-    # Extract the user details.
-    info = phone_response.ask(
-        question="Extract the user's phone number, full name, and facility name.",
-        example={"phone_number": "+16179011508", "full_name": "John Doe", "facility_name": "Facility A"}
-    )
-    random_value = RANDOM(10).generate()
-    answer_ = api.get_req(
-        url='https://apigateway.example.com/api/facilities',
-        headers={
-            'authorization': 'Bearer 123',
-            'cbh-facility-user-phone-number-auth': info["phone_number"],
-            'cbh-external-caller-session': random_value
-        }
-    ).ask(
-        question="Verify the provided details. If successful, return the user's name, facility name, and email; otherwise, return 'ERROR'.",
-        example={"name": "John Doe", "facility_name": "Facility A", "email": "john.doe@example.com", "success": true}
-    )
-    print("Answer:", answer_)
-
-    if not answer_["success"]:
-        loop:
-            phone_response = talk("Sorry, we couldn't verify your details. Please re-enter your information.", True)
-        until "User confirms corrected details":
-            info = phone_response.ask(
-                question="Return the user's phone number, full name, and facility name.",
-                example={"phone_number": "+16179011508", "full_name": "John Doe", "facility_name": "Facility A"}
-            )
-            state["info"] = info
-    else:
-        print("Verification successful:", answer_)
-
-Additional Notes
-Based’s design abstracts away complexity while providing powerful control over conversational flows.
-The constructs loop, talk, until, and ask empower you to design robust, interactive workflows.
-While this guide focuses on core constructs, Based supports integration with external services (APIs, email systems, SMS gateways) using an intuitive syntax.
-
-Conclusion
-Armed with these constructs, you can build dynamic, platform-agnostic conversational agents using Based. This guide has provided enhanced examples that showcase how to structure interactive conversations effectively. Happy coding!
-
-
-
-
-
-
-https://docs.usebrainbase.com/based-language-fundamentals
-
-Details of above link are below
-
-Based Language Fundamentals - Core Constructs Reference
-
-Based Language Fundamentals
-Welcome to the Based Language Fundamentals guide. This reference document provides a comprehensive explanation of Based’s core language constructs, their declaration syntax, arguments, and practical usage examples. Understanding these fundamentals will enable you to build sophisticated conversational agents with precision and confidence.
-
-Core Language Constructs
 Based is built around a set of specialized constructs designed specifically for conversational AI workflows. These constructs provide a high-level abstraction that makes it easy to build complex interactions without getting lost in implementation details.
 
-The say Function
-The say function generates a response from the AI to the user without expecting a reply. It’s typically used to provide information, instructions, or acknowledgments.
+### The `say` Function
 
-Syntax:
+The `say` function generates a response from the AI to the user without expecting a reply. It’s typically used to provide information, instructions, or acknowledgments.
 
+**Syntax:**
+
+```
 say(message, exact=False, model=None)
-Parameters:
+```
 
-message (string): The content to be processed and presented to the user
-exact (boolean, optional): Controls how the message is processed
-True: Outputs exactly what’s provided in the message parameter, verbatim
-False (default): Allows the AI to rephrase the message while maintaining its meaning
-model (string, optional): Specifies which AI model to use for processing the message (when exact=False)
-Return Value:
+**Parameters:**
 
-Returns the response text, which can be stored in a variable for later use or simply executed for its side effect
-Example:
+-   `message` (string): The content to be processed and presented to the user
+-   `exact` (boolean, optional): Controls how the message is processed
+    -   `True`: Outputs exactly what’s provided in the message parameter, verbatim
+    -   `False` (default): Allows the AI to rephrase the message while maintaining its meaning
+-   `model` (string, optional): Specifies which AI model to use for processing the message (when exact=False)
 
+**Return Value:**
 
+-   Returns the response text, which can be stored in a variable for later use or simply executed for its side effect
+
+**Example:**
+
+```
 # Greet the user with an exact message
 say("Welcome to BookBot! I'm here to help you find and reserve books.", exact=True)
 
@@ -149,13 +39,15 @@ say("Generate a friendly welcome for a user looking for book recommendations")
 
 # Store the response for later use
 intro = say("Introduce yourself as a helpful assistant", model="anthropic/claude-3.7-sonnet")
+```
 
+### The `loop`, `talk`, and `until` Pattern
 
-The loop, talk, and until Pattern
-In Based, the loop, talk, and until constructs form an essential pattern that must be used together. This pattern creates interactive conversation flows that can repeat until specific conditions are met. The talk function is not meant to be used in isolation.
+In Based, the `loop`, `talk`, and `until` constructs form an essential pattern that must be used together. This pattern creates interactive conversation flows that can repeat until specific conditions are met. The `talk` function is not meant to be used in isolation.
 
-Syntax:
+**Syntax:**
 
+```
 loop:
     response = talk(
         system_prompt,
@@ -166,24 +58,29 @@ loop:
 until "Description of the completion condition":
     # Validation code that determines if the condition is met
     # The loop continues until this code completes successfully
-Parameters for talk:
+```
 
-system_prompt (string): Instruction or prompt that guides the conversation
-first_prompt (boolean, optional): Controls conversation initiation
-True (default): AI starts by sending the prompt message to the user
-False: AI waits for the user to send a message first
-default_values (dict, optional): Example values to structure expected responses
-info (dict, optional): Additional context for the conversation
-The Loop-Until Pattern:
+**Parameters for `talk`:**
 
-The loop keyword begins a repeatable conversation block
-The talk function within the loop handles the conversation exchange
-The until clause specifies a condition (in natural language) under which the loop should end
-The code block after until validates whether the condition has been met
-If the condition is met (the code executes successfully), the loop exits
-If the condition is not met, the loop repeats from the beginning
-Example:
+-   `system_prompt` (string): Instruction or prompt that guides the conversation
+-   `first_prompt` (boolean, optional): Controls conversation initiation
+    -   `True` (default): AI starts by sending the prompt message to the user
+    -   `False`: AI waits for the user to send a message first
+-   `default_values` (dict, optional): Example values to structure expected responses
+-   `info` (dict, optional): Additional context for the conversation
 
+**The Loop-Until Pattern:**
+
+-   The `loop` keyword begins a repeatable conversation block
+-   The `talk` function within the loop handles the conversation exchange
+-   The `until` clause specifies a condition (in natural language) under which the loop should end
+-   The code block after `until` validates whether the condition has been met
+    -   If the condition is met (the code executes successfully), the loop exits
+    -   If the condition is not met, the loop repeats from the beginning
+
+**Example:**
+
+```
 loop:
     book_preference = talk(
         "What genre of books do you enjoy reading?",
@@ -207,27 +104,36 @@ until "User provides a valid book genre and format":
 
     # If we reach here, both genre and format are valid
     print("Valid preferences received!")
+```
 
-Data Processing Methods
+### Data Processing Methods
+
 Based provides powerful methods to transform and extract information from data objects. These methods can be applied to any data object, not just conversation responses.
 
-The .ask Method
-The .ask method extracts structured data from any data object, transforming unstructured content into well-formed data that can be used programmatically. This method can be used with API responses, conversation results, or any other data.
+#### The `.ask` Method
 
-Syntax:
+The `.ask` method extracts structured data from any data object, transforming unstructured content into well-formed data that can be used programmatically. This method can be used with API responses, conversation results, or any other data.
+
+**Syntax:**
+
+```
 data_object.ask(question, example=None, schema=None, model=None)
-Parameters:
+```
 
-question (string): Instruction for extracting specific information from the data
-example (dict, optional): Example object showing the expected output format
-schema (dict, optional): JSON schema defining the expected structure
-model (string, optional): AI model to use for extraction
-Return Value:
+**Parameters:**
 
-Returns structured data according to the example or schema provided
-Example:
+-   `question` (string): Instruction for extracting specific information from the data
+-   `example` (dict, optional): Example object showing the expected output format
+-   `schema` (dict, optional): JSON schema defining the expected structure
+-   `model` (string, optional): AI model to use for extraction
 
+**Return Value:**
 
+-   Returns structured data according to the example or schema provided
+
+**Example:**
+
+```
 # Extract structured book preferences from a conversation response
 preferences = response.ask(
     question="Extract the user's preferred book genre, format, and any specific authors they mentioned.",
@@ -247,24 +153,30 @@ api_results = api.get_req(
     question="Extract the book titles, authors, and prices from the API response.",
     example={"books": [{"title": "The Mystery", "author": "A. Writer", "price": "$12.99"}]}
 )
+```
 
-The .summarize Method
-The .summarize method creates a concise summary of the information contained in any data object. This is particularly useful for large text blocks or complex data structures.
+#### The `.summarize` Method
 
-Syntax:
+The `.summarize` method creates a concise summary of the information contained in any data object. This is particularly useful for large text blocks or complex data structures.
 
+**Syntax:**
 
+```
 data_object.summarize(prompt=None, model=None)
-Parameters:
+```
 
-prompt (string, optional): Specific instruction for creating the summary
-model (string, optional): AI model to use for summarization
-Return Value:
+**Parameters:**
 
-Returns a string containing the summary
-Example:
+-   `prompt` (string, optional): Specific instruction for creating the summary
+-   `model` (string, optional): AI model to use for summarization
 
+**Return Value:**
 
+-   Returns a string containing the summary
+
+**Example:**
+
+```
 # Summarize a lengthy document
 document_content = document.read(url="https://example.com/lengthy-report.pdf")
 summary = document_content.summarize(
@@ -276,12 +188,15 @@ search_results = google_search.search(query="latest developments in quantum comp
 key_points = search_results.summarize(
     prompt="Extract the 5 most significant recent breakthroughs in quantum computing mentioned in these results."
 )
-Advanced Patterns
+```
 
-Multiple until Statements
-Based allows for sophisticated conversation flows by supporting multiple until statements. Each until block represents a different condition and can trigger different handling paths.
+## Advanced Patterns
 
+### Multiple `until` Statements
 
+Based allows for sophisticated conversation flows by supporting multiple `until` statements. Each `until` block represents a different condition and can trigger different handling paths.
+
+```
 # Multi-condition conversation handler example
 loop:
     response = talk(
@@ -323,11 +238,13 @@ until "User wants to speak to human agent":
         say("I'll connect you with a customer service representative right away. Please hold for a moment.", exact=True)
         transfer_to_agent()
         break
+```
 
-Conditional Flow Control
+### Conditional Flow Control
+
 Based scripts can implement conditional flow control using standard Python syntax, allowing for dynamic conversation paths based on user responses.
 
-
+```
 # Determine recommendation approach based on user expertise and preferences
 loop:
     expertise_response = talk("How familiar are you with this book genre?", True)
@@ -362,42 +279,51 @@ until "User indicates their expertise level and reading preferences":
     # Display the recommendations
     for i, book in enumerate(recommendations[:3]):
         say(f"{i+1}. '{book['title']}' by {book['author']} - {book['description']}", exact=True)
+```
 
-Platform-Specific Functions
+## Platform-Specific Functions
+
 Based supports different deployment platforms (chat, voice, email, SMS) and provides specialized functions for each platform. These functions allow you to take advantage of platform-specific capabilities.
 
-Voice Deployment Functions
+### Voice Deployment Functions
+
 When your Based agent is deployed for voice conversations, you can use these special functions to control call flow:
 
-transfer_call(phone_number): Transfers the current call to another phone number.
+**`transfer_call(phone_number)`**: Transfers the current call to another phone number.
 
-
+```
 # Transfer call to customer support if user requests it
 if user_request["needs_human_support"]:
     say("I'll transfer you to our customer support team right away.", exact=True)
     transfer_call("+1-800-123-4567")
-hangup(): Ends the current call.
+```
 
+**`hangup()`**: Ends the current call.
 
+```
 # End call after completing the transaction
 say("Thank you for your order! Your confirmation number is ABC123. Have a great day!", exact=True)
 hangup()
+```
 
-SMS Deployment Functions
+### SMS Deployment Functions
+
 For SMS deployments, Based provides specialized functions for text messaging:
 
-send_image(url): Sends an image in the conversation.
+**`send_image(url)`**: Sends an image in the conversation.
 
-
+```
 # Send product image in SMS conversation
 product_details = get_product_info("ABC123")
 say(f"Here's the {product_details['name']} you inquired about:", exact=True)
 send_image(product_details["image_url"])
+```
 
-Full Example: Book Recommendation Agent
-Here’s a complete example that demonstrates the various language constructs working together, including multiple until statements:
+## Full Example: Book Recommendation Agent
 
+Here’s a complete example that demonstrates the various language constructs working together, including multiple `until` statements:
 
+```
 state = {}
 meta_prompt = "You're a book recommendation assistant helping users find their next great read."
 res = say("Hello! I'm BookBot, your personal book recommendation assistant.", exact=True)
@@ -525,9 +451,11 @@ until "User wants to check book availability":
 
 # Conversation wrap-up
 say("Is there anything else I can help you with today?", exact=True)
+```
 
-Conclusion
-The Based language provides a powerful yet intuitive framework for building conversational agents. By mastering the core constructs—particularly the essential loop-talk-until pattern—you can create sophisticated conversation flows that handle complex interactions while maintaining readability and maintainability.
+## Conclusion
+
+The Based language provides a powerful yet intuitive framework for building conversational agents. By mastering the core constructs—particularly the essential `loop`\-`talk`\-`until` pattern—you can create sophisticated conversation flows that handle complex interactions while maintaining readability and maintainability.
 
 Remember that Based is designed to be declarative, allowing you to focus on the “what” rather than the “how” of conversational AI. This approach dramatically reduces the amount of code needed to create powerful agents while increasing reliability and ease of maintenance.
 

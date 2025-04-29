@@ -9,15 +9,20 @@ const openai = new OpenAI({
 	apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Load Based Guide
-const BASED_GUIDE = fs.readFileSync(
-	path.join(__dirname, "../docs/docs.txt"),
-	"utf-8"
-);
+// Dynamically load and combine all docs
+const docsPath = path.join(__dirname, "../docs");
+
+const BASED_GUIDE = [
+	"BASED_LANGUAGE_FUNDAMENTALS.md",
+	"BASED_GUIDE.md",
+	"BASED_CRASH_COURSE.md",
+]
+	.map((fileName) => fs.readFileSync(path.join(docsPath, fileName), "utf-8"))
+	.join("\n\n"); // join with double line break
 
 export async function generateBasedCode(userPrompt: string): Promise<string> {
 	const response = await openai.chat.completions.create({
-		model: "gpt-4",
+		model: "gpt-4-turbo",
 		messages: [
 			{
 				role: "system",
