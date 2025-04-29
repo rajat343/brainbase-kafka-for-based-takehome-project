@@ -1,28 +1,50 @@
 import fs from "fs";
 import path from "path";
 
-// Function to create a safe filename from prompt
-export function generateFilenameFromPrompt(prompt: string): string {
+export function generateFolderNameFromPrompt(prompt: string): string {
 	const words = prompt
 		.toLowerCase()
-		.replace(/[^a-zA-Z0-9 ]/g, "") // remove special chars
+		.replace(/[^a-zA-Z0-9 ]/g, "")
 		.split(" ")
-		.filter((word) => word.length > 2) // ignore tiny words
-		.slice(0, 5) // pick first 5 meaningful words
+		.filter((w) => w.length > 2)
+		.slice(0, 5)
 		.join("_");
-
-	const filename = words || "based_agent";
-	return `${filename}.based`;
+	return words || "agent";
 }
 
-// Function to save code to outputs/
-export function saveBasedFile(filename: string, content: string): void {
-	const outputDir = path.join(__dirname, "../outputs");
-
-	if (!fs.existsSync(outputDir)) {
-		fs.mkdirSync(outputDir);
+export function saveBasedFile(
+	folder: string,
+	filename: string,
+	content: string
+): void {
+	try {
+		const folderPath = path.join(__dirname, `../outputs/${folder}`);
+		if (!fs.existsSync(folderPath)) {
+			fs.mkdirSync(folderPath, { recursive: true });
+		}
+		const fullPath = path.join(folderPath, filename);
+		fs.writeFileSync(fullPath, content, "utf-8");
+	} catch (err) {
+		console.error(`Failed to save ${filename} in ${folder}:`, err);
 	}
+}
 
-	const fullPath = path.join(outputDir, filename);
-	fs.writeFileSync(fullPath, content, { encoding: "utf-8" });
+export function readBasedFile(folder: string, filename: string): string {
+	try {
+		return fs.readFileSync(
+			path.join(__dirname, `../outputs/${folder}/${filename}`),
+			"utf-8"
+		);
+	} catch (err) {
+		console.error(`Failed to read ${filename} in ${folder}:`, err);
+		return "";
+	}
+}
+
+export function isValidBasedCode(code: string): boolean {
+	const hasLoop = code.includes("loop:");
+	const hasTalk = code.includes("talk(");
+	const hasUntil = code.includes('until "');
+
+	return hasLoop && hasTalk && hasUntil;
 }

@@ -5,20 +5,16 @@ import path from "path";
 
 dotenv.config();
 
-const openai = new OpenAI({
-	apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Dynamically load and combine all docs
 const docsPath = path.join(__dirname, "../docs");
-
 const BASED_GUIDE = [
 	"BASED_LANGUAGE_FUNDAMENTALS.md",
 	"BASED_GUIDE.md",
 	"BASED_CRASH_COURSE.md",
 ]
-	.map((fileName) => fs.readFileSync(path.join(docsPath, fileName), "utf-8"))
-	.join("\n\n"); // join with double line break
+	.map((file) => fs.readFileSync(path.join(docsPath, file), "utf-8"))
+	.join("\n\n");
 
 export async function generateBasedCode(userPrompt: string): Promise<string> {
 	const response = await openai.chat.completions.create({
@@ -26,19 +22,12 @@ export async function generateBasedCode(userPrompt: string): Promise<string> {
 		messages: [
 			{
 				role: "system",
-				content: `You are the world expert at writing Based (.based) files.
-Use only the Based documentation below to respond. Write Based code clearly and correctly.
-
-${BASED_GUIDE}
-`,
+				content: `You are an expert Based agent writer. Use only the documentation below to generate Based code.\n\n${BASED_GUIDE}`,
 			},
-			{
-				role: "user",
-				content: userPrompt,
-			},
+			{ role: "user", content: userPrompt },
 		],
 		temperature: 0.3,
-		max_tokens: 1500,
+		max_tokens: 2000,
 	});
 
 	return response.choices[0].message?.content || "";
