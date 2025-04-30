@@ -1,85 +1,122 @@
-import { useRef, useState } from "react";
+import React, { useState, useRef } from "react";
 import { CodePane } from "./components/CodePane";
 import { Loader } from "./components/Loader";
 import { DiffReview } from "./components/DiffReview";
-import { Hunk, Message } from "./types";
 import { ChatPane } from "./components/ChatPane";
+import { Hunk, Message } from "./types";
 
 const API = "http://localhost:3000";
 
 export default function App() {
-	const [code, setCode] = useState("");
-	const [loading, setLoading] = useState(false);
+	// State
+	const [code, setCode] = useState<string>("");
+	const [loading, setLoading] = useState<boolean>(false);
 	const [hunks, setHunks] = useState<Hunk[]>([]);
 	const [msgs, setMsgs] = useState<Message[]>([]);
-	const ws = useRef<WebSocket | null>(null);
+	const socketRef = useRef<WebSocket | null>(null);
+	const [hasWS, setHasWS] = useState<boolean>(false);
 
-	/* ----- helpers ----- */
-	const gen = async () => {
+	// Generate initial .based
+	const generate = async () => {
 		const idea = prompt("Describe the agent") || "";
 		if (!idea) return;
 		setLoading(true);
-		const r = await fetch(`${API}/generate`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ idea }),
-		}).then((r) => r.json());
-		setCode(r.code);
-		setLoading(false);
+		try {
+			const res = await fetch(`${API}/generate`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ idea }),
+			});
+			const { code } = await res.json();
+			setCode(code);
+		} catch (err) {
+			console.error(err);
+			alert("Failed to generate agent");
+		} finally {
+			setLoading(false);
+		}
 	};
 
+	// Draft diff hunks
 	const draftDiff = async () => {
-		const idea = prompt("Describe change") || "";
+		const idea = prompt("Describe a change") || "";
 		if (!idea) return;
-		const { hunks } = await fetch(`${API}/diff`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ idea }),
-		}).then((r) => r.json());
-		setHunks(hunks);
+		try {
+			const res = await fetch(`${API}/diff`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ idea }),
+			});
+			const { hunks } = await res.json();
+			setHunks(hunks);
+		} catch (err) {
+			console.error(err);
+			alert("Failed to draft diff");
+		}
 	};
 
+	// Toggle a hunk’s selected state
 	const toggleHunk = (id: string) =>
 		setHunks((h) =>
 			h.map((x) => (x.id === id ? { ...x, selected: !x.selected } : x))
 		);
 
+	// Apply selected hunks and re-fetch the updated code
 	const apply = async () => {
-		await fetch(`${API}/apply`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ hunks }),
-		});
-		const c = await fetch(`${API}/agent`).then((r) => r.text());
-		setCode(c);
-		setHunks([]);
+		try {
+			await fetch(`${API}/apply`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ hunks }),
+			});
+			const updated = await fetch(`${API}/agent`).then((r) => r.text());
+			setCode(updated);
+			setHunks([]);
+		} catch (err) {
+			console.error(err);
+			alert("Failed to apply hunks");
+		}
 	};
 
-	const createWS = () => {
-		ws.current = new WebSocket("ws://localhost:3000/ws");
-		ws.current.onmessage = (e) =>
-			setMsgs((m) => [...m, JSON.parse(e.data)]);
+	// Start the Python agent runner, then open WebSocket
+	const startAgent = async () => {
+		try {
+			const resp = await fetch(`${API}/run`, { method: "POST" });
+			if (!resp.ok) throw new Error("Runner failed");
+			// Open WebSocket after runner is launched
+			const socket = new WebSocket("ws://localhost:3000/ws");
+			socket.onmessage = (e) => {
+				const msg = JSON.parse(e.data) as Message;
+				setMsgs((prev) => [...prev, msg]);
+			};
+			socketRef.current = socket;
+			setHasWS(true);
+		} catch (err) {
+			console.error(err);
+			alert("Could not start agent: " + err);
+		}
 	};
 
-	const sendChat = (txt: string) => {
-		setMsgs((m) => [...m, { role: "user", content: txt }]);
-		ws.current?.send(txt);
+	// Send a message over WebSocket
+	const sendChat = (text: string) => {
+		const userMsg: Message = { role: "user", content: text };
+		setMsgs((prev) => [...prev, userMsg]);
+		socketRef.current?.send(text);
 	};
 
-	/* ----- UI ----- */
 	return (
 		<div className="h-screen grid grid-cols-2 gap-2 p-4 bg-gray-100">
-			{/* Controls / Code / Diff */}
+			{/* Left pane: controls, code, diff */}
 			<div className="flex flex-col space-y-2">
 				<div className="space-x-2">
-					<button className="btn" onClick={gen}>
+					<button className="btn" onClick={generate}>
 						Generate .based
 					</button>
 					<button className="btn bg-yellow-500" onClick={draftDiff}>
 						Draft diff
 					</button>
-					<button className="btn bg-green-600" onClick={createWS}>
-						Create Agent
+					<button className="btn bg-green-600" onClick={startAgent}>
+						Create Agent &amp; Chat
 					</button>
 				</div>
 
@@ -94,9 +131,9 @@ export default function App() {
 				/>
 			</div>
 
-			{/* Chat */}
+			{/* Right pane: chat */}
 			<div className="border rounded p-2 h-full">
-				{ws.current ? (
+				{hasWS ? (
 					<ChatPane messages={msgs} send={sendChat} />
 				) : (
 					<p className="h-full flex items-center justify-center text-gray-500">
@@ -105,7 +142,7 @@ export default function App() {
 				)}
 			</div>
 
-			{/* btn utility */}
+			{/* Tailwind “btn” utility */}
 			<style>{`.btn{@apply bg-blue-600 text-white px-3 py-2 rounded}`}</style>
 		</div>
 	);
