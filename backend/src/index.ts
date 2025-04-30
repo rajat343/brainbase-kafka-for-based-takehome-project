@@ -6,60 +6,74 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { WebSocketServer, WebSocket } from "ws";
+import OpenAI from "openai";
 import { folderName, saveFile, readFile } from "./utils";
 import { generateBasedCode } from "./openaiService";
 import { createDiffHunks, applySelectedHunks, Hunk } from "./diffEngine";
 import { validateBasedFile } from "./validate";
 
-dotenv.config(); // ← load .env before anything else!
+dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
 app.use(cors());
 app.use(express.json());
 
 let folder = "default_agent";
 
-/** GET current .based */
+/** GET current .based file */
 app.get("/agent", (_req: Request, res: Response) => {
 	const code = readFile(folder, "agent.based");
 	res.type("text/plain").send(code);
 });
 
-/** Generate initial Based file */
-app.post("/generate", async (req, res) => {
-	const idea: string = req.body.idea;
-	const code = await generateBasedCode(idea);
-	folder = folderName(idea);
-	saveFile(folder, "agent.based", code);
-	await validateBasedFile(folder);
-	res.json({ folder, code });
+/** POST /generate: create initial Based code */
+app.post("/generate", async (req: Request, res: Response) => {
+	try {
+		const idea: string = req.body.idea;
+		const code = await generateBasedCode(idea);
+		folder = folderName(idea);
+		saveFile(folder, "agent.based", code);
+		await validateBasedFile(folder);
+		res.json({ folder, code });
+	} catch (err) {
+		console.error("Generate error:", err);
+		res.status(500).json({ error: "Failed to generate Based code" });
+	}
 });
 
-/** Produce diff hunks */
-app.post("/diff", async (req, res) => {
-	const hunks = await createDiffHunks(folder, req.body.idea);
-	res.json({ hunks });
+/** POST /diff: produce diff hunks */
+app.post("/diff", async (req: Request, res: Response) => {
+	try {
+		const hunks = await createDiffHunks(folder, req.body.idea);
+		res.json({ hunks });
+	} catch (err) {
+		console.error("Diff error:", err);
+		res.status(500).json({ error: "Failed to create diffs" });
+	}
 });
 
-/** Apply selected hunks */
-app.post("/apply", async (req, res) => {
-	applySelectedHunks(folder, req.body.hunks as Hunk[]);
-	await validateBasedFile(folder);
-	res.json({ ok: true });
+/** POST /apply: apply selected hunks */
+app.post("/apply", async (req: Request, res: Response) => {
+	try {
+		applySelectedHunks(folder, req.body.hunks as Hunk[]);
+		await validateBasedFile(folder);
+		res.json({ ok: true });
+	} catch (err) {
+		console.error("Apply error:", err);
+		res.status(500).json({ error: "Failed to apply hunks" });
+	}
 });
 
-/** === START THE REAL AGENT RUNNER === **/
-app.post("/run", (req, res) => {
-	// pick up venv/python3
-	const venv = path.join(__dirname, "../venv/bin/python");
-	const pythonCmd = fs.existsSync(venv) ? venv : "python3";
-
+/** POST /run: launch the Python-based agent runner */
+app.post("/run", (_req: Request, res: Response) => {
+	const venvPy = path.join(__dirname, "../venv/bin/python");
+	const pythonCmd = fs.existsSync(venvPy) ? venvPy : "python3";
 	const runnerScript = path.join(__dirname, "../runner/brainbase_runner.py");
 
-	// spawn with 'inherit' so you see logs live in Node console
 	const proc = spawn(pythonCmd, [runnerScript], {
 		cwd: process.cwd(),
 		env: process.env,
@@ -67,38 +81,75 @@ app.post("/run", (req, res) => {
 	});
 
 	proc.on("error", (err) => {
-		console.error("🔥 Failed to start Python runner:", err);
+		console.error("Failed to start Python runner:", err);
 	});
 	proc.on("spawn", () => {
-		console.log("🚀 Brainbase runner started (PID:", proc.pid, ")");
+		console.log("Brainbase runner started (PID:", proc.pid, ")");
 	});
 
-	// immediately respond—runner stays alive in background
 	res.json({ ok: true, message: "Agent runner started" });
 });
 
-/** === WEBSOCKET ECHO / PROXY === **/
-interface Session {
-	msgs: { role: string; content: string }[];
-}
+/** WebSocket chat powered by OpenAI + Based code */
+wss.on("connection", async (ws: WebSocket) => {
+	console.log("WebSocket client connected");
 
-wss.on("connection", (ws: WebSocket) => {
-	console.log("⚡ WebSocket client connected");
-	const session: Session = { msgs: [] };
+	// Load the current .based file as system prompt
+	const basedCode = readFile(folder, "agent.based");
+	const history: {
+		role: "system" | "user" | "assistant";
+		content: string;
+	}[] = [{ role: "system", content: basedCode }];
 
-	ws.on("message", (data) => {
-		const txt = data.toString();
-		session.msgs.push({ role: "user", content: txt });
-		// For now, echo back. Later proxy to brainbase_runner via some channel.
-		const reply = { role: "agent", content: `Echo: ${txt}` };
-		session.msgs.push(reply);
-		ws.send(JSON.stringify(reply));
+	// Send initial greeting
+	try {
+		const initial = await openai.chat.completions.create({
+			model: "gpt-4-turbo",
+			temperature: 0.5,
+			messages: history,
+		});
+		const assistantMsg = initial.choices[0].message?.content || "";
+		history.push({ role: "assistant", content: assistantMsg });
+		ws.send(JSON.stringify({ role: "agent", content: assistantMsg }));
+	} catch (err) {
+		console.error("Initial greeting error:", err);
+		ws.send(
+			JSON.stringify({
+				role: "agent",
+				content: "Sorry, I couldn't start our conversation.",
+			})
+		);
+	}
+
+	// Handle incoming user messages
+	ws.on("message", async (data) => {
+		const userText = data.toString();
+		history.push({ role: "user", content: userText });
+
+		try {
+			const reply = await openai.chat.completions.create({
+				model: "gpt-4-turbo",
+				temperature: 0.5,
+				messages: history,
+			});
+			const assistantMsg = reply.choices[0].message?.content || "";
+			history.push({ role: "assistant", content: assistantMsg });
+			ws.send(JSON.stringify({ role: "agent", content: assistantMsg }));
+		} catch (err) {
+			console.error("Reply generation error:", err);
+			ws.send(
+				JSON.stringify({
+					role: "agent",
+					content: "I'm having trouble responding right now.",
+				})
+			);
+		}
 	});
 
-	ws.on("close", () => console.log("🔌 WebSocket client disconnected"));
+	ws.on("close", () => console.log("WebSocket client disconnected"));
 });
 
-/** === START HTTP + WS SERVER === **/
+/** Start HTTP + WS server */
 server.listen(3000, () => {
-	console.log("🌐 Backend + WS listening on http://localhost:3000");
+	console.log("Backend + WS listening on http://localhost:3000");
 });
