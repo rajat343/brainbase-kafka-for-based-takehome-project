@@ -1,50 +1,26 @@
 import fs from "fs";
 import path from "path";
 
-export function generateFolderNameFromPrompt(prompt: string): string {
-	const words = prompt
+export const folderName = (prompt: string) =>
+	prompt
 		.toLowerCase()
-		.replace(/[^a-zA-Z0-9 ]/g, "")
+		.replace(/[^a-z0-9 ]/g, "")
 		.split(" ")
-		.filter((w) => w.length > 2)
+		.filter((w) => w.length > 1)
 		.slice(0, 5)
-		.join("_");
-	return words || "agent";
-}
+		.join("_") || "agent";
 
-export function saveBasedFile(
-	folder: string,
-	filename: string,
-	content: string
-): void {
-	try {
-		const folderPath = path.join(__dirname, `../outputs/${folder}`);
-		if (!fs.existsSync(folderPath)) {
-			fs.mkdirSync(folderPath, { recursive: true });
-		}
-		const fullPath = path.join(folderPath, filename);
-		fs.writeFileSync(fullPath, content, "utf-8");
-	} catch (err) {
-		console.error(`Failed to save ${filename} in ${folder}:`, err);
-	}
-}
+export const ensureDir = (folder: string) => {
+	const p = path.join(__dirname, `../outputs/${folder}`);
+	if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
+	return p;
+};
 
-export function readBasedFile(folder: string, filename: string): string {
-	try {
-		return fs.readFileSync(
-			path.join(__dirname, `../outputs/${folder}/${filename}`),
-			"utf-8"
-		);
-	} catch (err) {
-		console.error(`Failed to read ${filename} in ${folder}:`, err);
-		return "";
-	}
-}
+export const saveFile = (folder: string, file: string, content: string) =>
+	fs.writeFileSync(path.join(ensureDir(folder), file), content, "utf-8");
 
-export function isValidBasedCode(code: string): boolean {
-	const hasLoop = code.includes("loop:");
-	const hasTalk = code.includes("talk(");
-	const hasUntil = code.includes('until "');
-
-	return hasLoop && hasTalk && hasUntil;
-}
+export const readFile = (folder: string, file: string) =>
+	fs.readFileSync(
+		path.join(__dirname, `../outputs/${folder}/${file}`),
+		"utf-8"
+	);

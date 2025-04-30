@@ -1,95 +1,44 @@
 import { generateBasedCode } from "./openaiService";
-import fs from "fs";
-import path from "path";
-import { execSync } from "child_process";
+import { readFile, saveFile } from "./utils";
 
-export async function generateDiff(
-	original: string,
-	idea: string
-): Promise<string> {
-	const prompt = `You are a diff generator. Given the Based code below and a change request, produce a unified diff.\n\nOriginal Based file:\n${original}\n\nUser request:\n${idea}\n\nOutput only a valid unified diff.`;
-	return await generateBasedCode(prompt);
+export interface Hunk {
+	id: string;
+	text: string;
+	selected: boolean;
 }
 
-export function validateDiff(diff: string): boolean {
-	return (
-		diff.includes("@@") &&
-		diff.includes("+++ agent.based") &&
-		diff.includes("--- agent.based")
-	);
-}
-
-export function applyDiff(
+export const createDiffHunks = async (
 	folder: string,
-	targetFile: string,
-	patchFile: string
-): boolean {
-	const targetPath = path.join(
-		__dirname,
-		`../outputs/${folder}/${targetFile}`
-	);
-	const patchPath = path.join(__dirname, `../outputs/${folder}/${patchFile}`);
+	idea: string
+): Promise<Hunk[]> => {
+	const original = readFile(folder, "agent.based");
+	const diffPrompt = `Generate a unified diff with @@ hunks to implement:\n${idea}\n\nOriginal file:\n${original}`;
+	const diff = await generateBasedCode(diffPrompt);
+	saveFile(folder, "agent.patch", diff);
+	return diff
+		.split(/(?=@@)/)
+		.filter(Boolean)
+		.map((t, i) => ({ id: `h${i}`, text: t, selected: true }));
+};
 
-	try {
-		let originalLines = fs.readFileSync(targetPath, "utf-8").split("\n");
-		const patchLines = fs.readFileSync(patchPath, "utf-8").split("\n");
-
-		let outputLines: string[] = [];
-		let oIndex = 0;
-		let pIndex = 0;
-
-		while (pIndex < patchLines.length) {
-			const patchLine = patchLines[pIndex];
-
-			if (patchLine.startsWith("---") || patchLine.startsWith("+++")) {
-				// Ignore headers
-				pIndex++;
-				continue;
-			}
-
-			if (patchLine.startsWith("@@")) {
-				// Parse the hunk header
-				const match = /@@ -(\d+),\d+ \+(\d+),\d+ @@/.exec(patchLine);
-				if (match) {
-					const [, origStart, newStart] = match.map(Number);
-					// Copy unchanged lines until the hunk start
-					while (oIndex < origStart - 1) {
-						outputLines.push(originalLines[oIndex]);
-						oIndex++;
-					}
-					pIndex++;
-				} else {
-					throw new Error("Invalid hunk header.");
-				}
-			} else if (patchLine.startsWith("-")) {
-				// Remove the line from original
-				oIndex++;
-				pIndex++;
-			} else if (patchLine.startsWith("+")) {
-				// Add the new line
-				outputLines.push(patchLine.slice(1));
-				pIndex++;
-			} else {
-				// Context line, must match original
-				outputLines.push(originalLines[oIndex]);
-				oIndex++;
-				pIndex++;
-			}
-		}
-
-		// Copy remaining lines from original if any
-		while (oIndex < originalLines.length) {
-			outputLines.push(originalLines[oIndex]);
-			oIndex++;
-		}
-
-		// Write the updated agent file
-		fs.writeFileSync(targetPath, outputLines.join("\n"), "utf-8");
-
-		console.log("Patch applied cleanly.");
-		return true;
-	} catch (err) {
-		console.error("Patch application failed:", err);
-		return false;
-	}
-}
+export const applySelectedHunks = (folder: string, hunks: Hunk[]) => {
+	const src = readFile(folder, "agent.based").split("\n");
+	let out: string[] = [];
+	let idx = 0;
+	hunks
+		.filter((h) => h.selected)
+		.forEach((h) => {
+			const lines = h.text.split("\n");
+			const header = lines.shift()!;
+			const [, aStr] = /@@ -(\d+)/.exec(header)!;
+			const a = Number(aStr) - 1;
+			while (idx < a) out.push(src[idx++]);
+			lines.forEach((l) => {
+				if (l.startsWith("+")) out.push(l.slice(1));
+				else if (l.startsWith("-")) idx++;
+				else out.push(src[idx++]);
+			});
+		});
+	while (idx < src.length) out.push(src[idx++]);
+	saveFile(folder, "agent.based", out.join("\n"));
+};

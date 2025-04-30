@@ -1,83 +1,66 @@
 import express, { Request, Response } from "express";
-import { generateDiff, validateDiff, applyDiff } from "./diffEngine";
+import http from "http";
+import cors from "cors";
+import { WebSocketServer, WebSocket } from "ws";
+import { folderName, saveFile, readFile } from "./utils";
 import { generateBasedCode } from "./openaiService";
-import {
-	generateFolderNameFromPrompt,
-	saveBasedFile,
-	readBasedFile,
-} from "./utils";
-import { runBasedAgent } from "./runner";
+import { createDiffHunks, applySelectedHunks, Hunk } from "./diffEngine";
+import { validateBasedFile } from "./validate";
 
 const app = express();
-const PORT = 3000;
-
-let activeFolder = "default_folder"; // track current folder
-
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+app.use(cors());
 app.use(express.json());
 
+let folder = "default_agent";
+
+/* -------- REST -------- */
+
 app.get("/agent", (_req: Request, res: Response) => {
-	try {
-		const content = readBasedFile(activeFolder, "agent.based");
-		res.send(content);
-	} catch (err) {
-		res.status(500).json({ error: "Failed to read agent file." });
-	}
+	const content = readFile(folder, "agent.based");
+	res.send(content);
 });
 
 app.post("/generate", async (req: Request, res: Response) => {
+	const idea = req.body.idea;
+	const code = await generateBasedCode(idea);
+	folder = folderName(idea);
+	saveFile(folder, "agent.based", code);
+	await validateBasedFile(folder);
+	res.json({ folder, code });
+});
+
+app.post("/diff", async (req: Request, res: Response) => {
 	try {
-		const { idea } = req.body;
-		const code = await generateBasedCode(idea);
-
-		const folder = generateFolderNameFromPrompt(idea);
-		activeFolder = folder;
-		saveBasedFile(folder, "agent.based", code);
-
-		res.json({ status: "finished", folder });
+		const hunks = await createDiffHunks(folder, req.body.idea);
+		res.json({ hunks });
 	} catch (err) {
-		res.status(500).json({ error: "Failed to generate agent." });
+		res.status(500).json({ error: "Failed to create diff hunks" });
 	}
 });
 
-app.post("/diff", async (req: any, res: any) => {
-	try {
-		const { idea } = req.body;
-		const base = readBasedFile(activeFolder, "agent.based");
-		const diff = await generateDiff(base, idea);
-		console.log("diff: ", diff);
-		// const valid = validateDiff(diff);
-		// if (!valid) {
-		// 	return res.status(400).json({ error: "Invalid diff format." });
-		// }
-
-		saveBasedFile(activeFolder, "agent.patch", diff);
-		res.json({ status: "diff_ready", diff });
-	} catch (err) {
-		res.status(500).json({ error: "Failed to generate diff." });
-	}
+app.post("/apply", async (req, res) => {
+	applySelectedHunks(folder, req.body.hunks as Hunk[]);
+	await validateBasedFile(folder);
+	res.json({ ok: true });
 });
 
-app.post("/apply", (_req: any, res: any) => {
-	try {
-		const success = applyDiff(activeFolder, "agent.based", "agent.patch");
-		if (!success) {
-			return res.status(500).json({ error: "Failed to apply patch." });
-		}
-		res.json({ status: "applied" });
-	} catch (err) {
-		res.status(500).json({ error: "Patch application failed." });
-	}
+/* -------- WS -------- */
+interface Session {
+	msgs: { role: string; content: string }[];
+}
+wss.on("connection", (ws: WebSocket) => {
+	const session: Session = { msgs: [] };
+	ws.on("message", (d) => {
+		const txt = d.toString();
+		session.msgs.push({ role: "user", content: txt });
+		const reply = { role: "agent", content: `Echo: ${txt}` };
+		session.msgs.push(reply);
+		ws.send(JSON.stringify(reply));
+	});
 });
 
-app.post("/run", async (_req: Request, res: Response) => {
-	try {
-		await runBasedAgent(activeFolder);
-		res.json({ status: "running" });
-	} catch (err) {
-		res.status(500).json({ error: "Runner failed", details: err });
-	}
-});
-
-app.listen(PORT, () => {
-	console.log(`Kafka server listening on http://localhost:${PORT}`);
-});
+server.listen(3000, () =>
+	console.log("Backend (HTTP+WS) on http://localhost:3000")
+);
