@@ -56,25 +56,42 @@ export default function App() {
 	};
 
 	// Toggle a hunk’s selected state
-	const toggleHunk = (id: string) =>
-		setHunks((h) =>
-			h.map((x) => (x.id === id ? { ...x, selected: !x.selected } : x))
+	const toggleHunk = async (id: string) => {
+		// update local state
+		const newHunks = hunks.map((h) =>
+			h.id === id ? { ...h, selected: !h.selected } : h
 		);
+		setHunks(newHunks);
+		// call /preview for an in-memory patch
+		try {
+			const resp = await fetch(`${API}/preview`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ hunks: newHunks }),
+			});
+			const { code: previewCode } = await resp.json();
+			setCode(previewCode);
+		} catch (err) {
+			console.error("Preview failed:", err);
+		}
+	};
 
 	// Apply selected hunks and re-fetch the updated code
 	const apply = async () => {
 		try {
-			await fetch(`${API}/apply`, {
+			const resp = await fetch(`${API}/apply`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ hunks }),
 			});
-			const updated = await fetch(`${API}/agent`).then((r) => r.text());
-			setCode(updated);
+			const { ok, code: updatedCode, error } = await resp.json();
+			if (!ok) throw new Error(error || "Apply failed");
+
+			setCode(updatedCode!);
 			setHunks([]);
-		} catch (err) {
-			console.error(err);
-			alert("Failed to apply hunks");
+		} catch (err: any) {
+			console.error("Apply failed:", err);
+			alert("Error applying changes: " + err.message);
 		}
 	};
 

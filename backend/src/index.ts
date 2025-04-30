@@ -9,7 +9,12 @@ import { WebSocketServer, WebSocket } from "ws";
 import OpenAI from "openai";
 import { folderName, saveFile, readFile } from "./utils";
 import { generateBasedCode } from "./openaiService";
-import { createDiffHunks, applySelectedHunks, Hunk } from "./diffEngine";
+import {
+	createDiffHunks,
+	applySelectedHunks,
+	Hunk,
+	applyHunksToText,
+} from "./diffEngine";
 import { validateBasedFile } from "./validate";
 
 dotenv.config();
@@ -58,13 +63,24 @@ app.post("/diff", async (req: Request, res: Response) => {
 
 /** POST /apply: apply selected hunks */
 app.post("/apply", async (req: Request, res: Response) => {
+	const hunks = req.body.hunks as Hunk[];
 	try {
-		applySelectedHunks(folder, req.body.hunks as Hunk[]);
-		await validateBasedFile(folder);
-		res.json({ ok: true });
-	} catch (err) {
+		// 1. Apply to disk
+		applySelectedHunks(folder, hunks);
+		// 2. Read back updated file
+		const updatedCode = readFile(folder, "agent.based");
+		// 3. Fire-and-forget validation
+		validateBasedFile(folder).catch((err) =>
+			console.error("Post-apply validation failed:", err)
+		);
+		// 4. Return the new code
+		res.json({ ok: true, code: updatedCode });
+	} catch (err: any) {
 		console.error("Apply error:", err);
-		res.status(500).json({ error: "Failed to apply hunks" });
+		res.status(500).json({
+			ok: false,
+			error: err.message || "Apply failed",
+		});
 	}
 });
 
@@ -73,21 +89,30 @@ app.post("/run", (_req: Request, res: Response) => {
 	const venvPy = path.join(__dirname, "../venv/bin/python");
 	const pythonCmd = fs.existsSync(venvPy) ? venvPy : "python3";
 	const runnerScript = path.join(__dirname, "../runner/brainbase_runner.py");
-
 	const proc = spawn(pythonCmd, [runnerScript], {
 		cwd: process.cwd(),
 		env: process.env,
 		stdio: "inherit",
 	});
-
 	proc.on("error", (err) => {
 		console.error("Failed to start Python runner:", err);
 	});
 	proc.on("spawn", () => {
 		console.log("Brainbase runner started (PID:", proc.pid, ")");
 	});
-
 	res.json({ ok: true, message: "Agent runner started" });
+});
+
+app.post("/preview", (req: Request, res: Response) => {
+	try {
+		const hunks = req.body.hunks as Hunk[];
+		const original = readFile(folder, "agent.based");
+		const previewCode = applyHunksToText(original, hunks);
+		res.json({ code: previewCode });
+	} catch (err: any) {
+		console.error("Preview error:", err);
+		res.status(500).json({ error: "Failed to preview changes" });
+	}
 });
 
 /** WebSocket chat powered by OpenAI + Based code */
