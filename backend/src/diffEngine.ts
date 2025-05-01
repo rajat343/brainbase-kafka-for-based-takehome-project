@@ -13,10 +13,7 @@ export const createDiffHunks = async (
 	folder: string,
 	idea: string
 ): Promise<Hunk[]> => {
-	// 1. Read original .based
 	const original = readFile(folder, "agent.based");
-
-	// 2. Build a prompt that *requires* proper diff headers + hunks
 	const prompt = [
 		"You are a Based-language diff engine. Produce a **unified diff**",
 		"(no ``` fences) between the ORIGINAL and an updated version that",
@@ -34,20 +31,12 @@ export const createDiffHunks = async (
 		"",
 		"Output only the diff text.",
 	].join("\n");
-
-	// 3. Get the diff from the LLM
 	let diff = await generateBasedCode(prompt);
-
-	// 4. Strip any stray code-fences
 	diff = diff
 		.replace(/^\s*```[^\n]*\n/gm, "")
 		.replace(/```/g, "")
 		.trim();
-
-	// 5. Save full patch for debugging
 	saveFile(folder, "agent.patch", diff);
-
-	// 6. Split into lines and skip the first two lines if they're file headers
 	const lines = diff.split("\n");
 	let i = 0;
 	while (
@@ -56,19 +45,15 @@ export const createDiffHunks = async (
 	) {
 		i++;
 	}
-
-	// 7. Extract real hunks (those beginning with @@)
 	const hunks: Hunk[] = [];
 	while (i < lines.length) {
 		if (lines[i].startsWith("@@ ")) {
 			const start = i;
 			i++;
-			// Collect until next hunk or end
 			while (i < lines.length && !lines[i].startsWith("@@ ")) {
 				i++;
 			}
 			const hunkLines = lines.slice(start, i);
-			// Only keep if there is at least one addition or removal
 			if (hunkLines.some((l) => l.startsWith("+") || l.startsWith("-"))) {
 				hunks.push({
 					id: `hunk${hunks.length}`,
@@ -80,7 +65,6 @@ export const createDiffHunks = async (
 			i++;
 		}
 	}
-
 	return hunks;
 };
 
@@ -95,19 +79,17 @@ export function applyHunksToText(original: string, hunks: Hunk[]): string {
 	const src = original.split("\n");
 	let out: string[] = [],
 		idx = 0;
-	hunks
-		.filter((h) => h.selected)
-		.forEach((h) => {
-			const lines = h.text.split("\n");
-			const header = lines.shift()!; // "@@ -start,len +start,len @@"
-			const start = parseInt(/@@ -(\d+)/.exec(header)![1], 10) - 1;
-			while (idx < start) out.push(src[idx++]);
-			lines.forEach((l) => {
-				if (l.startsWith("+")) out.push(l.slice(1));
-				else if (l.startsWith("-")) idx++;
-				else out.push(src[idx++]);
-			});
-		});
+	for (const h of hunks.filter((h) => h.selected)) {
+		const lines = h.text.split("\n");
+		const header = lines.shift()!;
+		const start = parseInt(/@@ -(\d+)/.exec(header)![1], 10) - 1;
+		while (idx < start) out.push(src[idx++]);
+		for (const l of lines) {
+			if (l.startsWith("+")) out.push(l.slice(1));
+			else if (l.startsWith("-")) idx++;
+			else out.push(src[idx++]);
+		}
+	}
 	while (idx < src.length) out.push(src[idx++]);
 	return out.join("\n");
 }

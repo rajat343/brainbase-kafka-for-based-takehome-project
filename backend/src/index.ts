@@ -23,19 +23,20 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const PORT = process.env.PORT;
+const BASE_URL = process.env.BASE_URL;
 
 app.use(cors());
 app.use(express.json());
 
 let folder = "default_agent";
 
-/** GET current .based file */
+// REST APIs
 app.get("/agent", (_req: Request, res: Response) => {
 	const code = readFile(folder, "agent.based");
 	res.type("text/plain").send(code);
 });
 
-/** POST /generate: create initial Based code */
 app.post("/generate", async (req: Request, res: Response) => {
 	try {
 		const idea: string = req.body.idea;
@@ -50,7 +51,6 @@ app.post("/generate", async (req: Request, res: Response) => {
 	}
 });
 
-/** POST /diff: produce diff hunks */
 app.post("/diff", async (req: Request, res: Response) => {
 	try {
 		const hunks = await createDiffHunks(folder, req.body.idea);
@@ -61,11 +61,10 @@ app.post("/diff", async (req: Request, res: Response) => {
 	}
 });
 
-/** POST /apply: apply selected hunks */
 app.post("/apply", async (req, res) => {
 	try {
 		const hunks = req.body.hunks as Hunk[];
-		applySelectedHunks(folder, hunks); // ← disk is updated here
+		applySelectedHunks(folder, hunks);
 		const updatedCode = readFile(folder, "agent.based");
 		validateBasedFile(folder).catch((e) => console.error(e));
 		res.json({ ok: true, code: updatedCode });
@@ -75,7 +74,6 @@ app.post("/apply", async (req, res) => {
 	}
 });
 
-/** POST /run: launch the Python-based agent runner */
 app.post("/run", (_req: Request, res: Response) => {
 	const venvPy = path.join(__dirname, "../venv/bin/python");
 	const pythonCmd = fs.existsSync(venvPy) ? venvPy : "python3";
@@ -97,8 +95,8 @@ app.post("/run", (_req: Request, res: Response) => {
 app.post("/preview", (req, res) => {
 	try {
 		const hunks = req.body.hunks as Hunk[];
-		const original = readFile(folder, "agent.based");
-		const previewCode = applyHunksToText(original, hunks);
+		const original = readFile(folder, "agent.based"); // read disk
+		const previewCode = applyHunksToText(original, hunks); // in-memory only
 		res.json({ code: previewCode });
 	} catch (err: any) {
 		console.error("Preview error:", err);
@@ -106,18 +104,14 @@ app.post("/preview", (req, res) => {
 	}
 });
 
-/** WebSocket chat powered by OpenAI + Based code */
+// Web socket
 wss.on("connection", async (ws: WebSocket) => {
 	console.log("WebSocket client connected");
-
-	// Load the current .based file as system prompt
 	const basedCode = readFile(folder, "agent.based");
 	const history: {
 		role: "system" | "user" | "assistant";
 		content: string;
 	}[] = [{ role: "system", content: basedCode }];
-
-	// Send initial greeting
 	try {
 		const initial = await openai.chat.completions.create({
 			model: "gpt-4-turbo",
@@ -136,12 +130,9 @@ wss.on("connection", async (ws: WebSocket) => {
 			})
 		);
 	}
-
-	// Handle incoming user messages
 	ws.on("message", async (data) => {
 		const userText = data.toString();
 		history.push({ role: "user", content: userText });
-
 		try {
 			const reply = await openai.chat.completions.create({
 				model: "gpt-4-turbo",
@@ -161,11 +152,9 @@ wss.on("connection", async (ws: WebSocket) => {
 			);
 		}
 	});
-
 	ws.on("close", () => console.log("WebSocket client disconnected"));
 });
 
-/** Start HTTP + WS server */
-server.listen(3000, () => {
-	console.log("Backend + WS listening on http://localhost:3000");
+server.listen(PORT, () => {
+	console.log(`Backend and Websocket listening on ${BASE_URL}:${PORT}`);
 });
