@@ -1,5 +1,7 @@
 import { readFile, saveFile } from "./utils";
 import { generateBasedCode } from "./openaiService";
+import { readFileSync, writeFileSync } from "fs";
+import path from "path";
 
 export interface Hunk {
 	id: string;
@@ -82,18 +84,24 @@ export const createDiffHunks = async (
 	return hunks;
 };
 
-export const applySelectedHunks = (folder: string, hunks: Hunk[]) => {
-	const src = readFile(folder, "agent.based").split("\n");
-	let out: string[] = [];
-	let idx = 0;
+export function applySelectedHunks(folder: string, hunks: Hunk[]) {
+	const filePath = path.join(__dirname, `../outputs/${folder}/agent.based`);
+	const original = readFileSync(filePath, "utf-8");
+	const updated = applyHunksToText(original, hunks);
+	writeFileSync(filePath, updated, "utf-8");
+}
+
+export function applyHunksToText(original: string, hunks: Hunk[]): string {
+	const src = original.split("\n");
+	let out: string[] = [],
+		idx = 0;
 	hunks
 		.filter((h) => h.selected)
 		.forEach((h) => {
 			const lines = h.text.split("\n");
-			const header = lines.shift()!;
-			const [, aStr] = /@@ -(\d+)/.exec(header)!;
-			const a = Number(aStr) - 1;
-			while (idx < a) out.push(src[idx++]);
+			const header = lines.shift()!; // "@@ -start,len +start,len @@"
+			const start = parseInt(/@@ -(\d+)/.exec(header)![1], 10) - 1;
+			while (idx < start) out.push(src[idx++]);
 			lines.forEach((l) => {
 				if (l.startsWith("+")) out.push(l.slice(1));
 				else if (l.startsWith("-")) idx++;
@@ -101,42 +109,5 @@ export const applySelectedHunks = (folder: string, hunks: Hunk[]) => {
 			});
 		});
 	while (idx < src.length) out.push(src[idx++]);
-	saveFile(folder, "agent.based", out.join("\n"));
-};
-
-export function applyHunksToText(original: string, hunks: Hunk[]): string {
-	const srcLines = original.split("\n");
-	let out: string[] = [];
-	let idx = 0;
-	// Only process hunks with `selected === true`
-	hunks
-		.filter((h) => h.selected)
-		.forEach((h) => {
-			const lines = h.text.split("\n");
-			const header = lines.shift()!;
-			const match = /@@ -(\d+)/.exec(header);
-			const start = match ? parseInt(match[1], 10) - 1 : idx;
-			// copy lines up to this hunk
-			while (idx < start) {
-				out.push(srcLines[idx]);
-				idx++;
-			}
-			// apply the hunk’s changes
-			lines.forEach((l) => {
-				if (l.startsWith("+")) {
-					out.push(l.slice(1));
-				} else if (l.startsWith("-")) {
-					idx++;
-				} else {
-					out.push(srcLines[idx]);
-					idx++;
-				}
-			});
-		});
-	// copy any remaining lines
-	while (idx < srcLines.length) {
-		out.push(srcLines[idx]);
-		idx++;
-	}
 	return out.join("\n");
 }

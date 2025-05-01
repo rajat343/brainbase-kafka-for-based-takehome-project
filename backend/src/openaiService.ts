@@ -32,11 +32,7 @@ export async function generateBasedCode(userPrompt: string): Promise<string> {
 			{ role: "user", content: userPrompt },
 		],
 	});
-
 	let code = res.choices[0].message?.content || "";
-
-	// In case the model still wraps in ``` fences, strip them:
 	code = code.replace(/^\s*```[^\n]*\n/, "").replace(/\n```+\s*$/, "");
-
 	return code.trim();
 }

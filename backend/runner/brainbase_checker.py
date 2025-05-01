@@ -21,7 +21,6 @@ class BrainbaseChecker:
                     print(f"Connected to {self.url}")
                     await self._initialize(ws)
 
-                    # Listen for response after initialization
                     while True:
                         msg = await ws.receive(timeout=10)
                         if msg.type == aiohttp.WSMsgType.TEXT:

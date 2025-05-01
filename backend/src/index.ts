@@ -62,25 +62,16 @@ app.post("/diff", async (req: Request, res: Response) => {
 });
 
 /** POST /apply: apply selected hunks */
-app.post("/apply", async (req: Request, res: Response) => {
-	const hunks = req.body.hunks as Hunk[];
+app.post("/apply", async (req, res) => {
 	try {
-		// 1. Apply to disk
-		applySelectedHunks(folder, hunks);
-		// 2. Read back updated file
+		const hunks = req.body.hunks as Hunk[];
+		applySelectedHunks(folder, hunks); // ← disk is updated here
 		const updatedCode = readFile(folder, "agent.based");
-		// 3. Fire-and-forget validation
-		validateBasedFile(folder).catch((err) =>
-			console.error("Post-apply validation failed:", err)
-		);
-		// 4. Return the new code
+		validateBasedFile(folder).catch((e) => console.error(e));
 		res.json({ ok: true, code: updatedCode });
 	} catch (err: any) {
 		console.error("Apply error:", err);
-		res.status(500).json({
-			ok: false,
-			error: err.message || "Apply failed",
-		});
+		res.status(500).json({ ok: false, error: err.message });
 	}
 });
 
@@ -103,7 +94,7 @@ app.post("/run", (_req: Request, res: Response) => {
 	res.json({ ok: true, message: "Agent runner started" });
 });
 
-app.post("/preview", (req: Request, res: Response) => {
+app.post("/preview", (req, res) => {
 	try {
 		const hunks = req.body.hunks as Hunk[];
 		const original = readFile(folder, "agent.based");
