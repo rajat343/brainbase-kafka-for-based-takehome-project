@@ -137,14 +137,23 @@ export default function App() {
 		<div className="h-screen grid grid-cols-2 gap-2 p-4 bg-gray-100">
 			{/* Left pane: Controls, Code, Diff */}
 			<div className="flex flex-col space-y-2">
-				<div className="space-x-2">
-					<button className="btn" onClick={generate}>
+				<div className="flex space-x-4 mb-4">
+					<button
+						className="btn bg-blue-600 hover:bg-blue-700"
+						onClick={generate}
+					>
 						Generate .based
 					</button>
-					<button className="btn bg-yellow-500" onClick={draftDiff}>
+					<button
+						className="btn bg-yellow-500 hover:bg-yellow-600"
+						onClick={draftDiff}
+					>
 						Draft diff
 					</button>
-					<button className="btn bg-green-600" onClick={startAgent}>
+					<button
+						className="btn bg-green-600 hover:bg-green-700"
+						onClick={startAgent}
+					>
 						Create Agent &amp; Chat
 					</button>
 				</div>
@@ -170,7 +179,11 @@ export default function App() {
 			</div>
 
 			{/* Tailwind “btn” utility */}
-			<style>{`.btn{@apply bg-blue-600 text-white px-3 py-2 rounded}`}</style>
+			<style>{`
+				.btn {
+					@apply text-white px-6 py-3 rounded transition;
+				}
+			`}</style>
 		</div>
 	);
 }
