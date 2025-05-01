@@ -7,7 +7,6 @@ export const DiffHunk = ({
 	hunk: Hunk;
 	onToggle: (id: string) => void;
 }) => {
-	// Split into lines and color-code them
 	const lines = hunk.text.split("\n");
 	return (
 		<div className="border rounded mb-2 overflow-auto">
@@ -29,7 +28,7 @@ export const DiffHunk = ({
 					className="px-2 py-1 bg-green-600 text-white rounded"
 					onClick={() => onToggle(hunk.id)}
 				>
-					{hunk.selected ? "✅ keep" : "♻ restore"}
+					{hunk.selected ? "♻ restore" : "✅ keep"}
 				</button>
 				<button
 					className="px-2 py-1 bg-red-600 text-white rounded"

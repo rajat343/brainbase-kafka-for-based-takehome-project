@@ -1,13 +1,11 @@
-// frontend/src/App.tsx
-
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { CodePane } from "./components/CodePane";
 import { Loader } from "./components/Loader";
 import { DiffReview } from "./components/DiffReview";
 import { ChatPane } from "./components/ChatPane";
 import { Hunk, Message } from "./types";
 
-const API = "http://localhost:3000";
+const BACKEND_BASE_URL = "http://localhost:3000";
 
 export default function App() {
 	// Code and diff state
@@ -20,23 +18,13 @@ export default function App() {
 	const socketRef = useRef<WebSocket | null>(null);
 	const [hasWS, setHasWS] = useState<boolean>(false);
 
-	/** Fetch initial .based code after generation or apply */
-	const fetchAgentCode = async () => {
-		try {
-			const text = await fetch(`${API}/agent`).then((r) => r.text());
-			setCode(text);
-		} catch (err) {
-			console.error("Failed to fetch agent code:", err);
-		}
-	};
-
 	/** Generate a new .based file from a user idea */
 	const generate = async () => {
 		const idea = prompt("Describe the agent") || "";
 		if (!idea) return;
 		setLoading(true);
 		try {
-			const res = await fetch(`${API}/generate`, {
+			const res = await fetch(`${BACKEND_BASE_URL}/generate`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ idea }),
@@ -57,7 +45,7 @@ export default function App() {
 		const idea = prompt("Describe a change") || "";
 		if (!idea) return;
 		try {
-			const res = await fetch(`${API}/diff`, {
+			const res = await fetch(`${BACKEND_BASE_URL}/diff`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ idea }),
@@ -73,7 +61,7 @@ export default function App() {
 	/** Preview the in-memory application of hunks */
 	const previewHunks = async (hunksToPreview: Hunk[]) => {
 		try {
-			const resp = await fetch(`${API}/preview`, {
+			const resp = await fetch(`${BACKEND_BASE_URL}/preview`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ hunks: hunksToPreview }),
@@ -95,7 +83,7 @@ export default function App() {
 	/** Commit selected hunks to disk and fetch the final code */
 	const apply = async () => {
 		try {
-			const resp = await fetch(`${API}/apply`, {
+			const resp = await fetch(`${BACKEND_BASE_URL}/apply`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ hunks }),
@@ -104,13 +92,12 @@ export default function App() {
 			if (!ok) throw new Error(error || "Apply failed");
 			setCode(updatedCode!);
 			setHunks([]); // clear diffs
-		} catch (err: any) {
+		} catch (err) {
 			console.error("Apply error:", err);
-			alert("Error applying changes: " + err.message);
+			alert("Error applying changes: " + err);
 		}
 	};
 
-	/** Toggle a single hunk’s selected flag */
 	const toggleHunk = (id: string) => {
 		setHunks((prev) =>
 			prev.map((h) => (h.id === id ? { ...h, selected: !h.selected } : h))
@@ -121,10 +108,11 @@ export default function App() {
 		if (hunks.length > 0) previewHunks(hunks);
 	}, [hunks]);
 
-	/** Start the Python-based agent runner, then open a WS session */
 	const startAgent = async () => {
 		try {
-			const res = await fetch(`${API}/run`, { method: "POST" });
+			const res = await fetch(`${BACKEND_BASE_URL}/run`, {
+				method: "POST",
+			});
 			if (!res.ok) throw new Error("Runner start failed");
 			const ws = new WebSocket("ws://localhost:3000/ws");
 			ws.onmessage = (e) => {
@@ -139,7 +127,7 @@ export default function App() {
 		}
 	};
 
-	/** Send user chat text over WS */
+	// Send user chat text over Websocket
 	const sendChat = (text: string) => {
 		setMsgs((prev) => [...prev, { role: "user", content: text }]);
 		socketRef.current?.send(text);
