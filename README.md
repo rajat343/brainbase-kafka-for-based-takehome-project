@@ -30,7 +30,7 @@ npm install
 # Python setup
 python3 -m venv venv
 source venv/bin/activate
-pip install aiohttp
+pip install brainbase_labs python-dotenv aiohttp
 
 npm run dev
 # Server and Websocket would be running on http://localhost:3000
