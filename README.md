@@ -48,6 +48,8 @@ npm run dev
 ```
 OPENAI_API_KEY=your_openai_key
 BRAINBASE_API_KEY=your_brainbase_key
+PORT=3000
+BASE_URL=http://localhost
 WORKER_ID=your_worker_id
 FLOW_ID=your_flow_id
 ```
