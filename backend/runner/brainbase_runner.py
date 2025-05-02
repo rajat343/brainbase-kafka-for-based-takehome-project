@@ -1,32 +1,30 @@
+#!/usr/bin/env python3
+
 import asyncio
 import json
 import aiohttp
-import sys 
+import sys
 import os
+
 class BrainbaseRunner:
     def __init__(self, worker_id, flow_id, api_key, host="wss://brainbase-engine-python.onrender.com"):
         self.worker_id = worker_id
         self.flow_id = flow_id
         self.api_key = api_key
         self.host = host
-        # Construct the URL using a secure WebSocket connection.
         self.url = f"{self.host}/{self.worker_id}/{self.flow_id}?api_key={self.api_key}"
     
     async def start(self):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(self.url) as ws:
                 print(f"Connected to {self.url}")
-                # Send an initialization message to the engine.
                 await self._initialize(ws)
-                # Create tasks: one to listen to server messages and one to let the user send chat messages.
                 listen_task = asyncio.create_task(self._listen(ws))
-                chat_task = asyncio.create_task(self._chat(ws))
-                # Wait until one of the tasks completes (e.g. the user exits, or the connection stops).
+                chat_task   = asyncio.create_task(self._chat(ws))
                 done, pending = await asyncio.wait(
                     [listen_task, chat_task],
                     return_when=asyncio.FIRST_COMPLETED
                 )
-                # Cancel any remaining tasks.
                 for task in pending:
                     task.cancel()
     
@@ -43,84 +41,67 @@ class BrainbaseRunner:
         print("Initialization message sent.")
     
     async def _listen(self, ws):
-        # Create a buffer to accumulate streaming chunks.
         stream_buffer = ""
         streaming_active = False
         try:
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
-                    try:
-                        message_obj = json.loads(msg.data)
-                        action = message_obj.get("action")
-                        if action in ["message", "response"]:
-                            # Regular non-streaming message
-                            if streaming_active:
-                                print()  # finish any previous streaming output
-                                streaming_active = False
-                                stream_buffer = ""
-                            print("Agent:", message_obj["data"].get("message"))
-                        elif action == "stream":
-                            # Handle streaming content
-                            stream_chunk = message_obj["data"].get("message", "")
-                            if not streaming_active:
-                                # First chunk of a streaming sequence
-                                print("Agent: ", end="")
-                                streaming_active = True
-                                stream_buffer = ""
-                            
-                            # Print only the new chunk
-                            print(stream_chunk, end="")
-                            stream_buffer += stream_chunk
-                            sys.stdout.flush()
-                        elif action == "function_call":
-                            if streaming_active:
-                                print()  # ensure any pending streaming output ends
-                                streaming_active = False
-                                stream_buffer = ""
-                            print("Function call requested:", message_obj["data"].get("function"))
-                        elif action == "error":
-                            if streaming_active:
-                                print()
-                                streaming_active = False
-                                stream_buffer = ""
-                            print("Error from server:", message_obj["data"].get("message"))
-                        elif action == "done":
-                            # End of a streamed message: add a newline.
-                            if streaming_active:
-                                print()
-                                streaming_active = False
-                                stream_buffer = ""
-                            print("Operation completed successfully:", message_obj["data"])
-                        else:
-                            if streaming_active:
-                                print()
-                                streaming_active = False
-                                stream_buffer = ""
-                            print("Unknown action received:", action)
-                    except Exception as e:
-                        print("Error parsing message:", e)
+                    data = json.loads(msg.data)
+                    action = data.get("action")
+                    if action in ["message", "response"]:
+                        if streaming_active:
+                            print(); streaming_active = False
+                        print("Agent:", data["data"].get("message"))
+                    elif action == "stream":
+                        chunk = data["data"].get("message","")
+                        if not streaming_active:
+                            print("Agent: ", end="")
+                            streaming_active = True
+                        print(chunk, end=""); stream_buffer += chunk; sys.stdout.flush()
+                    elif action == "error":
+                        if streaming_active: print(); streaming_active = False
+                        print("Error from server:", data["data"].get("message"))
+                    elif action == "done":
+                        if streaming_active: print(); streaming_active = False
+                        print("Operation completed:", data["data"])
+                    else:
+                        if streaming_active: print(); streaming_active = False
+                        print("Unknown action:", action)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     print("WebSocket error:", ws.exception())
                     break
         except Exception as e:
-            print("Listener task encountered an error:", e)
+            print("Listener error:", e)
     
     async def _chat(self, ws):
         loop = asyncio.get_event_loop()
-        # Loop to get user input and then send it via the WebSocket.
         while True:
-            # Use run_in_executor to avoid blocking the event loop.
-            user_input = await loop.run_in_executor(None, input, "You: \n")
-            if user_input.lower() in ["exit", "quit"]:
+            user_input = await loop.run_in_executor(None, input, "You: ")
+            if user_input.lower() in ["exit","quit"]:
                 print("Exiting chat...")
                 await ws.close()
                 break
-            chat_message = {
-                "action": "message",
-                "data": {"message": user_input}
-            }
             try:
-                await ws.send_str(json.dumps(chat_message))
+                await ws.send_str(json.dumps({
+                    "action":"message",
+                    "data":{"message": user_input}
+                }))
             except Exception as e:
-                print("Failed to send message:", e)
+                print("Send error:", e)
                 break
+
+if __name__ == "__main__":
+    # Read worker_id & flow_id from CLI or fall back to ENV
+    if len(sys.argv) >= 3:
+        worker_id, flow_id = sys.argv[1], sys.argv[2]
+    else:
+        worker_id = os.environ.get("WORKER_ID")
+        flow_id   = os.environ.get("FLOW_ID")
+    api_key = os.environ.get("BRAINBASE_API_KEY")
+
+    if not worker_id or not flow_id or not api_key:
+        print("Usage: python brainbase_runner.py <worker_id> <flow_id>")
+        sys.exit(1)
+
+    runner = BrainbaseRunner(worker_id, flow_id, api_key)
+    asyncio.run(runner.start())

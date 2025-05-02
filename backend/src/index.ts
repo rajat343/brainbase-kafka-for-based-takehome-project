@@ -74,22 +74,51 @@ app.post("/apply", async (req, res) => {
 	}
 });
 
-app.post("/run", (_req: Request, res: Response) => {
-	const venvPy = path.join(__dirname, "../venv/bin/python");
-	const pythonCmd = fs.existsSync(venvPy) ? venvPy : "python3";
-	const runnerScript = path.join(__dirname, "../runner/brainbase_runner.py");
-	const proc = spawn(pythonCmd, [runnerScript], {
-		cwd: process.cwd(),
-		env: process.env,
-		stdio: "inherit",
-	});
-	proc.on("error", (err) => {
-		console.error("Failed to start Python runner:", err);
-	});
-	proc.on("spawn", () => {
-		console.log("Brainbase runner started (PID:", proc.pid, ")");
-	});
-	res.json({ ok: true, message: "Agent runner started" });
+app.post("/run", async (_req: any, res: any) => {
+	try {
+		const pythonPath = path.join(__dirname, "../venv/bin/python");
+		const pythonCmd = fs.existsSync(pythonPath) ? pythonPath : "python3";
+		const setupPy = path.join(__dirname, "../runner/setup.py");
+		const basedFile = path.join(
+			process.cwd(),
+			"outputs",
+			folder,
+			"agent.based"
+		);
+		const setupProc = spawn(pythonCmd, [setupPy, basedFile], {
+			cwd: process.cwd(),
+			env: process.env,
+		});
+		let out = "";
+		setupProc.stdout.on("data", (b) => (out += b.toString()));
+		setupProc.stderr.on("data", (b) =>
+			console.error("[setup stderr]", b.toString())
+		);
+		await new Promise<void>((resolve, reject) => {
+			setupProc.on("exit", (code) =>
+				code === 0 ? resolve() : reject(new Error("setup.py failed"))
+			);
+			setupProc.on("error", reject);
+		});
+		const { worker_id, flow_id } = JSON.parse(out);
+		const runnerPy = path.join(__dirname, "../runner/brainbase_runner.py");
+		const runner = spawn(pythonCmd, [runnerPy, worker_id, flow_id], {
+			cwd: process.cwd(),
+			env: process.env,
+			stdio: "inherit",
+		});
+
+		runner.on("spawn", () =>
+			console.log("Runner started (PID:", runner.pid, ")")
+		);
+		runner.on("error", (err) =>
+			console.error("Failed to start runner:", err)
+		);
+		return res.json({ ok: true, worker_id, flow_id });
+	} catch (err: any) {
+		console.error("Run error:", err);
+		return res.status(500).json({ ok: false, error: err.message });
+	}
 });
 
 app.post("/preview", (req, res) => {
