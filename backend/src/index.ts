@@ -65,6 +65,19 @@ app.post("/diff", async (req: Request, res: Response) => {
 	}
 });
 
+// POST /preview — return an in-memory patch preview without writing disk
+app.post("/preview", (req, res) => {
+	try {
+		const hunks = req.body.hunks as Hunk[];
+		const original = readFile(folder, "agent.based"); // read disk
+		const previewCode = applyHunksToText(original, hunks); // in-memory only
+		res.json({ code: previewCode });
+	} catch (err: any) {
+		console.error("Preview error:", err);
+		res.status(500).json({ error: "Failed to preview changes" });
+	}
+});
+
 // POST /apply — apply selected hunks permanently to agent.based
 app.post("/apply", async (req, res) => {
 	try {
@@ -123,19 +136,6 @@ app.post("/run", async (_req: any, res: any) => {
 	} catch (err: any) {
 		console.error("Run error:", err);
 		return res.status(500).json({ ok: false, error: err.message });
-	}
-});
-
-// POST /preview — return an in-memory patch preview without writing disk
-app.post("/preview", (req, res) => {
-	try {
-		const hunks = req.body.hunks as Hunk[];
-		const original = readFile(folder, "agent.based"); // read disk
-		const previewCode = applyHunksToText(original, hunks); // in-memory only
-		res.json({ code: previewCode });
-	} catch (err: any) {
-		console.error("Preview error:", err);
-		res.status(500).json({ error: "Failed to preview changes" });
 	}
 });
 
