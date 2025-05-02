@@ -191,5 +191,5 @@ wss.on("connection", async (ws: WebSocket) => {
 });
 
 server.listen(PORT, () => {
-	console.log(`Backend and Websocket listening on ${BASE_URL}:${PORT}`);
+	console.log(`Listening on ${BASE_URL}:${PORT}`);
 });
