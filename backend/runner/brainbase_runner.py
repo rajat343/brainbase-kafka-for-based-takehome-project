@@ -12,19 +12,24 @@ class BrainbaseRunner:
         self.flow_id = flow_id
         self.api_key = api_key
         self.host = host
+        # Construct the URL using a secure WebSocket connection.
         self.url = f"{self.host}/{self.worker_id}/{self.flow_id}?api_key={self.api_key}"
     
     async def start(self):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(self.url) as ws:
                 print(f"Connected to {self.url}")
+                # Send an initialization message to the engine.
                 await self._initialize(ws)
+                # Create tasks: one to listen to server messages and one to let the user send chat messages.
                 listen_task = asyncio.create_task(self._listen(ws))
                 chat_task   = asyncio.create_task(self._chat(ws))
+                # Wait until one of the tasks completes (e.g. the user exits, or the connection stops).
                 done, pending = await asyncio.wait(
                     [listen_task, chat_task],
                     return_when=asyncio.FIRST_COMPLETED
                 )
+                # Cancel any remaining tasks.
                 for task in pending:
                     task.cancel()
     
@@ -75,7 +80,9 @@ class BrainbaseRunner:
     
     async def _chat(self, ws):
         loop = asyncio.get_event_loop()
+        # Loop to get user input and then send it via the WebSocket.
         while True:
+            # Use run_in_executor to avoid blocking the event loop.
             user_input = await loop.run_in_executor(None, input, "You: ")
             if user_input.lower() in ["exit","quit"]:
                 print("Exiting chat...")

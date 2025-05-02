@@ -32,11 +32,14 @@ app.use(express.json());
 let folder = "default_agent";
 
 // REST APIs
+
+// GET /agent — return the current .based file contents
 app.get("/agent", (_req: Request, res: Response) => {
 	const code = readFile(folder, "agent.based");
 	res.type("text/plain").send(code);
 });
 
+// POST /generate — generate a new .based file from user idea
 app.post("/generate", async (req: Request, res: Response) => {
 	try {
 		const idea: string = req.body.idea;
@@ -51,6 +54,7 @@ app.post("/generate", async (req: Request, res: Response) => {
 	}
 });
 
+// POST /diff — produce unified diff hunks for a proposed change
 app.post("/diff", async (req: Request, res: Response) => {
 	try {
 		const hunks = await createDiffHunks(folder, req.body.idea);
@@ -61,6 +65,7 @@ app.post("/diff", async (req: Request, res: Response) => {
 	}
 });
 
+// POST /apply — apply selected hunks permanently to agent.based
 app.post("/apply", async (req, res) => {
 	try {
 		const hunks = req.body.hunks as Hunk[];
@@ -74,6 +79,7 @@ app.post("/apply", async (req, res) => {
 	}
 });
 
+// POST /run — register .based as a Brainbase flow and start the Python runner
 app.post("/run", async (_req: any, res: any) => {
 	try {
 		const pythonPath = path.join(__dirname, "../venv/bin/python");
@@ -121,6 +127,7 @@ app.post("/run", async (_req: any, res: any) => {
 	}
 });
 
+// POST /preview — return an in-memory patch preview without writing disk
 app.post("/preview", (req, res) => {
 	try {
 		const hunks = req.body.hunks as Hunk[];

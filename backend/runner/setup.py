@@ -6,6 +6,7 @@ import os
 from brainbase_labs import BrainbaseLabs
 from dotenv import load_dotenv
 
+# load from .env
 load_dotenv()
 
 if len(sys.argv) < 2:
@@ -20,12 +21,14 @@ if not api_key:
 
 bb = BrainbaseLabs(api_key=api_key)
 
+# create worker
 worker = bb.workers.create(
     name=os.path.basename(based_path).replace(".based","") + "_worker",
     description="Auto-generated worker from setup.py",
     status="active"
 )
 
+# create new flow version
 flow = bb.workers.flows.create(
     worker_id=worker.id,
     path=based_path,
