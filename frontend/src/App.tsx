@@ -18,7 +18,7 @@ export default function App() {
 	const socketRef = useRef<WebSocket | null>(null);
 	const [hasWS, setHasWS] = useState<boolean>(false);
 
-	/** Generate a new .based file from a user idea */
+	// Generate a new .based file from a user idea
 	const generate = async () => {
 		const idea = prompt("Describe the agent") || "";
 		if (!idea) return;
@@ -40,7 +40,7 @@ export default function App() {
 		}
 	};
 
-	/** Request diff hunks for a proposed change */
+	// Request diff hunks for a proposed change
 	const draftDiff = async () => {
 		const idea = prompt("Describe a change") || "";
 		if (!idea) return;
@@ -58,7 +58,7 @@ export default function App() {
 		}
 	};
 
-	/** Preview the in-memory application of hunks */
+	// Preview the in-memory application of hunks
 	const previewHunks = async (hunksToPreview: Hunk[]) => {
 		try {
 			const resp = await fetch(`${BACKEND_BASE_URL}/preview`, {
@@ -73,14 +73,14 @@ export default function App() {
 		}
 	};
 
-	/** Whenever the hunks array changes, immediately update the preview */
+	// Whenever the hunks array changes, immediately update the preview
 	useEffect(() => {
 		if (hunks.length > 0) {
 			previewHunks(hunks);
 		}
 	}, [hunks]);
 
-	/** Commit selected hunks to disk and fetch the final code */
+	// Commit selected hunks to disk and fetch the final code
 	const apply = async () => {
 		try {
 			const resp = await fetch(`${BACKEND_BASE_URL}/apply`, {
