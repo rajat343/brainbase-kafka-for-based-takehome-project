@@ -113,7 +113,6 @@ app.post("/run", async (_req: any, res: any) => {
 			env: process.env,
 			stdio: "inherit",
 		});
-
 		runner.on("spawn", () =>
 			console.log("Runner started (PID:", runner.pid, ")")
 		);
