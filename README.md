@@ -21,7 +21,7 @@ Kafka enables you to build AI agents using the Based language. You can:
 
 ---
 
-## ⚙️ Backend Setup
+## ⚙️ Setup
 
 ```bash
 cd backend
@@ -33,10 +33,10 @@ source venv/bin/activate
 pip install brainbase_labs python-dotenv aiohttp
 
 npm run dev
-# Server and Websocket would be running on http://localhost:3000
+# Listening on http://localhost:3000
 ```
 
-```
+```bash
 cd frontend
 npm install
 npm run dev
